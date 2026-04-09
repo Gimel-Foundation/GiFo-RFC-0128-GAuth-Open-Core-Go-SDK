@@ -167,7 +167,10 @@ func (h *HTTPHandler) suspendMandate(w http.ResponseWriter, r *http.Request, id 
         var body struct {
                 Reason string `json:"reason"`
         }
-        json.NewDecoder(r.Body).Decode(&body)
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+                writeErrorResponse(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+                return
+        }
         actorID := r.Header.Get("X-Actor-ID")
         if err := h.Manager.SuspendMandate(id, actorID, body.Reason); err != nil {
                 writeErrorResponse(w, http.StatusBadRequest, "TRANSITION_ERROR", err.Error())
@@ -199,7 +202,10 @@ func (h *HTTPHandler) revokeMandate(w http.ResponseWriter, r *http.Request, id s
         var body struct {
                 Reason string `json:"reason"`
         }
-        json.NewDecoder(r.Body).Decode(&body)
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+                writeErrorResponse(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+                return
+        }
         actorID := r.Header.Get("X-Actor-ID")
         if err := h.Manager.RevokeMandate(id, actorID, body.Reason); err != nil {
                 writeErrorResponse(w, http.StatusBadRequest, "TRANSITION_ERROR", err.Error())
