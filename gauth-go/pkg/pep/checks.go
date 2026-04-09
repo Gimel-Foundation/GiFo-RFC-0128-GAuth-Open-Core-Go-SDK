@@ -538,6 +538,32 @@ func checkTransaction(req *EnforcementRequest, snap *PoASnapshot) CheckResult {
                 }
         }
 
+        allowed := map[string]bool{
+                "read":     true,
+                "write":    true,
+                "execute":  true,
+                "transfer": true,
+                "approve":  true,
+        }
+
+        if !allowed[req.Action.TransactionType] {
+                return CheckResult{
+                        CheckID:   "CHK-11",
+                        CheckName: "Transaction Type",
+                        Result:    poa.CheckFail,
+                        Detail:    fmt.Sprintf("Transaction type %q is not in the permitted set", req.Action.TransactionType),
+                }
+        }
+
+        if snap.Scope.Phase == poa.PhasePlan && req.Action.TransactionType != "read" {
+                return CheckResult{
+                        CheckID:   "CHK-11",
+                        CheckName: "Transaction Type",
+                        Result:    poa.CheckFail,
+                        Detail:    fmt.Sprintf("Transaction type %q is not permitted in plan phase (read-only)", req.Action.TransactionType),
+                }
+        }
+
         return CheckResult{
                 CheckID:   "CHK-11",
                 CheckName: "Transaction Type",
@@ -553,6 +579,31 @@ func checkDecisionType(req *EnforcementRequest, snap *PoASnapshot) CheckResult {
                         CheckName: "Decision Type",
                         Result:    poa.CheckSkip,
                         Detail:    "No decision type specified",
+                }
+        }
+
+        allowed := map[string]bool{
+                "automated":          true,
+                "human_approved":     true,
+                "escalated":          true,
+                "advisory":           true,
+        }
+
+        if !allowed[req.Action.DecisionType] {
+                return CheckResult{
+                        CheckID:   "CHK-12",
+                        CheckName: "Decision Type",
+                        Result:    poa.CheckFail,
+                        Detail:    fmt.Sprintf("Decision type %q is not in the permitted set", req.Action.DecisionType),
+                }
+        }
+
+        if snap.Requirements.ApprovalMode == poa.ApprovalFourEyes && req.Action.DecisionType == "automated" {
+                return CheckResult{
+                        CheckID:   "CHK-12",
+                        CheckName: "Decision Type",
+                        Result:    poa.CheckFail,
+                        Detail:    "Automated decisions are not permitted under four-eyes approval mode",
                 }
         }
 
@@ -684,10 +735,19 @@ func checkDelegationChain(req *EnforcementRequest, snap *PoASnapshot) CheckResul
         }
 
         maxDepth := 0
-        verbKey := extractVerbKey(req.Action.Verb)
         if snap.Scope.CoreVerbs != nil {
-                if policy, ok := snap.Scope.CoreVerbs[verbKey]; ok && policy.Constraints != nil && policy.Constraints.MaxDelegationDepth != nil {
-                        maxDepth = *policy.Constraints.MaxDelegationDepth
+                if policy, ok := snap.Scope.CoreVerbs["foundry.agent.delegate"]; ok {
+                        if !policy.Allowed {
+                                return CheckResult{
+                                        CheckID:   "CHK-16",
+                                        CheckName: "Delegation Chain",
+                                        Result:    poa.CheckFail,
+                                        Detail:    "Delegation verb is not allowed but delegation chain is present",
+                                }
+                        }
+                        if policy.Constraints != nil && policy.Constraints.MaxDelegationDepth != nil {
+                                maxDepth = *policy.Constraints.MaxDelegationDepth
+                        }
                 }
         }
 
@@ -698,6 +758,27 @@ func checkDelegationChain(req *EnforcementRequest, snap *PoASnapshot) CheckResul
                         CheckName: "Delegation Chain",
                         Result:    poa.CheckFail,
                         Detail:    fmt.Sprintf("Delegation chain depth %d exceeds max %d", chainLen, maxDepth),
+                }
+        }
+
+        for i := 1; i < chainLen; i++ {
+                if snap.DelegationChain.Entries[i].Depth <= snap.DelegationChain.Entries[i-1].Depth {
+                        return CheckResult{
+                                CheckID:   "CHK-16",
+                                CheckName: "Delegation Chain",
+                                Result:    poa.CheckFail,
+                                Detail:    fmt.Sprintf("Delegation chain depth is non-monotonic at entry %d", i),
+                        }
+                }
+        }
+
+        lastEntry := snap.DelegationChain.Entries[chainLen-1]
+        if snap.Subject != "" && lastEntry.DelegateeID != snap.Subject {
+                return CheckResult{
+                        CheckID:   "CHK-16",
+                        CheckName: "Delegation Chain",
+                        Result:    poa.CheckFail,
+                        Detail:    fmt.Sprintf("Delegation chain terminal delegatee %q does not match credential subject %q", lastEntry.DelegateeID, snap.Subject),
                 }
         }
 

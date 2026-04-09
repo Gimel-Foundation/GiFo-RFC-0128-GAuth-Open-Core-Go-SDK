@@ -458,3 +458,164 @@ func TestPEPAuditRecord(t *testing.T) {
                 t.Errorf("AgentID = %q, want %q", dec.Audit.AgentID, "agent-test")
         }
 }
+
+func TestPEPTransactionTypeInvalid(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        req := &EnforcementRequest{
+                RequestID: "req-txn-invalid",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go", TransactionType: "destroy"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for invalid transaction type", dec.Decision)
+        }
+}
+
+func TestPEPTransactionTypePlanPhaseBlock(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        snap.Scope.Phase = poa.PhasePlan
+        req := &EnforcementRequest{
+                RequestID: "req-txn-plan",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go", TransactionType: "write"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for write in plan phase", dec.Decision)
+        }
+}
+
+func TestPEPDecisionTypeInvalid(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        req := &EnforcementRequest{
+                RequestID: "req-dec-invalid",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go", DecisionType: "magic"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for invalid decision type", dec.Decision)
+        }
+}
+
+func TestPEPDecisionTypeAutomatedFourEyes(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        snap.Requirements.ApprovalMode = poa.ApprovalFourEyes
+        req := &EnforcementRequest{
+                RequestID: "req-dec-4eyes",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go", DecisionType: "automated"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for automated under four-eyes", dec.Decision)
+        }
+}
+
+func TestPEPDelegationChainNonMonotonic(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        snap.Scope.CoreVerbs["foundry.agent.delegate"] = poa.ToolPolicy{Allowed: true, CostCentsBase: 5}
+        snap.DelegationChain = &poa.DelegationChain{
+                Entries: []poa.DelegationEntry{
+                        {DelegateeID: "agent-a", Depth: 1},
+                        {DelegateeID: "agent-b", Depth: 1},
+                },
+        }
+        req := &EnforcementRequest{
+                RequestID: "req-chain-mono",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-b"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for non-monotonic chain", dec.Decision)
+        }
+}
+
+func TestPEPDelegationChainSubjectMismatch(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        snap.Scope.CoreVerbs["foundry.agent.delegate"] = poa.ToolPolicy{Allowed: true, CostCentsBase: 5}
+        snap.Subject = "agent-test"
+        snap.DelegationChain = &poa.DelegationChain{
+                Entries: []poa.DelegationEntry{
+                        {DelegateeID: "agent-a", Depth: 1},
+                        {DelegateeID: "agent-different", Depth: 2},
+                },
+        }
+        req := &EnforcementRequest{
+                RequestID: "req-chain-subj",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for terminal delegatee mismatch", dec.Decision)
+        }
+}

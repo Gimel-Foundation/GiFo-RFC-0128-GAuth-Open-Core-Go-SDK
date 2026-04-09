@@ -1,6 +1,8 @@
 package management
 
 import (
+        "net/http"
+        "net/http/httptest"
         "testing"
 
         "github.com/gimelfoundation/gauth-go/pkg/poa"
@@ -401,5 +403,51 @@ func TestStoreMutationIsolation(t *testing.T) {
         m2, _ := mgr.GetMandate(resp.MandateID)
         if m2.Status != poa.StatusDraft {
                 t.Errorf("Store mutation leaked: status = %q, want draft", m2.Status)
+        }
+}
+
+func TestHTTPEmptyMandateID(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+
+        req := httptest.NewRequest(http.MethodGet, "/gauth/mgmt/v1/mandates/", nil)
+        rr := httptest.NewRecorder()
+        mux.ServeHTTP(rr, req)
+
+        if rr.Code != http.StatusBadRequest {
+                t.Errorf("Expected 400 for empty mandate ID, got %d", rr.Code)
+        }
+}
+
+func TestHTTPDelegationRoute(t *testing.T) {
+        mgr := newTestManager()
+        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+        mgr.ActivateMandate(resp.MandateID, "admin")
+
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+
+        req := httptest.NewRequest(http.MethodPost, "/gauth/mgmt/v1/mandates/"+resp.MandateID+"/delegate", nil)
+        rr := httptest.NewRecorder()
+        mux.ServeHTTP(rr, req)
+
+        if rr.Code == http.StatusNotFound {
+                t.Error("Delegation route should be registered, got 404")
+        }
+}
+
+func TestCreateDelegationNilCoreVerbsDenied(t *testing.T) {
+        mgr := newTestManager()
+        reqBody := validCreationRequest()
+        reqBody.Scope.CoreVerbs = nil
+        resp, _ := mgr.CreateMandate(reqBody, "admin")
+        mgr.ActivateMandate(resp.MandateID, "admin")
+
+        err := mgr.CreateDelegation(resp.MandateID, "admin", "agent-sub")
+        if err == nil {
+                t.Error("Expected error for delegation with nil CoreVerbs (fail-closed)")
         }
 }

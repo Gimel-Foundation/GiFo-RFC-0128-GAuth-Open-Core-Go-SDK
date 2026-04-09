@@ -41,7 +41,7 @@ func TestRegistrySignatureVerification(t *testing.T) {
 
         registry.AddTrustedKey(pub)
 
-        payload := []byte("test-adapter-registration-payload")
+        payload, _ := RegistrationPayload("custom-enrichment", TypeAIEnrichment)
         sig := ed25519.Sign(priv, payload)
 
         err = registry.Register(Registration{
@@ -70,7 +70,7 @@ func TestRegistryInvalidSignature(t *testing.T) {
         registry.AddTrustedKey(pub)
 
         _, wrongPriv, _ := ed25519.GenerateKey(rand.Reader)
-        payload := []byte("test-adapter-registration-payload")
+        payload, _ := RegistrationPayload("bad-adapter", TypeAIEnrichment)
         wrongSig := ed25519.Sign(wrongPriv, payload)
 
         err = registry.Register(Registration{
@@ -107,7 +107,7 @@ func TestRegistryDuplicateAdapter(t *testing.T) {
         pub, priv, _ := ed25519.GenerateKey(rand.Reader)
         registry.AddTrustedKey(pub)
 
-        payload := []byte("dup-adapter-payload")
+        payload, _ := RegistrationPayload("noop", TypeAIEnrichment)
         sig := ed25519.Sign(priv, payload)
 
         err := registry.Register(Registration{
@@ -120,6 +120,28 @@ func TestRegistryDuplicateAdapter(t *testing.T) {
 
         if err == nil {
                 t.Error("Expected error for duplicate adapter registration")
+        }
+}
+
+func TestRegistryPayloadMismatch(t *testing.T) {
+        registry := NewRegistry()
+
+        pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+        registry.AddTrustedKey(pub)
+
+        payload, _ := RegistrationPayload("different-name", TypeAIEnrichment)
+        sig := ed25519.Sign(priv, payload)
+
+        err := registry.Register(Registration{
+                Name:      "actual-name",
+                Type:      TypeAIEnrichment,
+                Adapter:   &NoOpAIEnrichmentAdapter{},
+                Signature: sig,
+                Payload:   payload,
+        })
+
+        if err == nil {
+                t.Error("Expected error for payload mismatch")
         }
 }
 

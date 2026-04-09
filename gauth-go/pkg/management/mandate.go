@@ -281,20 +281,22 @@ func (m *MandateManager) CreateDelegation(mandateID, actorID, delegateeID string
                 return fmt.Errorf("%w: cannot delegate from state %s (must be active)", ErrInvalidTransition, mandate.Status)
         }
 
-        if mandate.Scope.CoreVerbs != nil {
-                dp, exists := mandate.Scope.CoreVerbs["foundry.agent.delegate"]
-                if !exists || !dp.Allowed {
-                        return fmt.Errorf("%w: delegation verb is not allowed in this mandate", ErrValidationFailed)
-                }
+        if mandate.Scope.CoreVerbs == nil {
+                return fmt.Errorf("%w: no core_verbs defined — delegation denied by default", ErrValidationFailed)
+        }
 
-                if dp.Constraints != nil && dp.Constraints.MaxDelegationDepth != nil {
-                        currentDepth := 0
-                        if mandate.Parties.Delegation != nil {
-                                currentDepth = len(mandate.Parties.Delegation.Entries)
-                        }
-                        if currentDepth >= *dp.Constraints.MaxDelegationDepth {
-                                return fmt.Errorf("%w: max delegation depth %d reached", ErrValidationFailed, *dp.Constraints.MaxDelegationDepth)
-                        }
+        dp, exists := mandate.Scope.CoreVerbs["foundry.agent.delegate"]
+        if !exists || !dp.Allowed {
+                return fmt.Errorf("%w: delegation verb is not allowed in this mandate", ErrValidationFailed)
+        }
+
+        if dp.Constraints != nil && dp.Constraints.MaxDelegationDepth != nil {
+                currentDepth := 0
+                if mandate.Parties.Delegation != nil {
+                        currentDepth = len(mandate.Parties.Delegation.Entries)
+                }
+                if currentDepth >= *dp.Constraints.MaxDelegationDepth {
+                        return fmt.Errorf("%w: max delegation depth %d reached", ErrValidationFailed, *dp.Constraints.MaxDelegationDepth)
                 }
         }
 

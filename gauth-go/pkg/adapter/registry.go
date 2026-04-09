@@ -2,17 +2,24 @@ package adapter
 
 import (
         "crypto/ed25519"
+        "encoding/json"
         "errors"
         "fmt"
         "sync"
 )
 
 var (
-        ErrAdapterNotFound     = errors.New("gauth: adapter not found")
-        ErrInvalidSignature    = errors.New("gauth: adapter signature verification failed")
+        ErrAdapterNotFound      = errors.New("gauth: adapter not found")
+        ErrInvalidSignature     = errors.New("gauth: adapter signature verification failed")
         ErrAdapterAlreadyExists = errors.New("gauth: adapter already registered")
-        ErrMissingSignature    = errors.New("gauth: adapter registration requires Ed25519 signature")
+        ErrMissingSignature     = errors.New("gauth: adapter registration requires Ed25519 signature")
+        ErrPayloadMismatch      = errors.New("gauth: signed payload does not match registration fields")
 )
+
+type registrationPayload struct {
+        Name string      `json:"name"`
+        Type AdapterType `json:"type"`
+}
 
 type AdapterType string
 
@@ -76,8 +83,21 @@ func (r *Registry) Register(reg Registration) error {
                 return ErrInvalidSignature
         }
 
+        var bound registrationPayload
+        if err := json.Unmarshal(reg.Payload, &bound); err != nil {
+                return fmt.Errorf("%w: payload is not valid JSON", ErrPayloadMismatch)
+        }
+        if bound.Name != reg.Name || bound.Type != reg.Type {
+                return fmt.Errorf("%w: payload name/type (%q/%q) does not match registration (%q/%q)",
+                        ErrPayloadMismatch, bound.Name, bound.Type, reg.Name, reg.Type)
+        }
+
         r.adapters[key] = reg.Adapter
         return nil
+}
+
+func RegistrationPayload(name string, adapterType AdapterType) ([]byte, error) {
+        return json.Marshal(registrationPayload{Name: name, Type: adapterType})
 }
 
 func (r *Registry) registerInternal(reg Registration) error {
