@@ -41,7 +41,7 @@ Go module implementing the Gimel Foundation's GAuth authorization protocol.
 
 ### Key Commands
 
-- `cd gauth-go && go test ./... -v` — run all tests (39 tests across 5 packages)
+- `cd gauth-go && go test ./... -v` — run all tests (100+ tests across 5 packages)
 - `cd gauth-go && go build ./...` — build all packages
 - `cd gauth-go && go build ./examples/basic/` — build example program
 

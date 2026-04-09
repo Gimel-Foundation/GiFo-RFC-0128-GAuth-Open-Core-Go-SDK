@@ -6,15 +6,30 @@ import (
         "github.com/gimelfoundation/gauth-go/pkg/poa"
 )
 
+type StateStore interface {
+        GetMandateState(mandateID string) (*LiveMandateState, error)
+        DeductBudget(mandateID string, cents int) error
+        IncrementToolCalls(mandateID string) error
+}
+
 type PEP struct {
-        Version string
-        Mode    poa.EnforcementMode
+        Version    string
+        Mode       poa.EnforcementMode
+        StateStore StateStore
 }
 
 func New(version string, mode poa.EnforcementMode) *PEP {
         return &PEP{
                 Version: version,
                 Mode:    mode,
+        }
+}
+
+func NewStateful(version string, store StateStore) *PEP {
+        return &PEP{
+                Version:    version,
+                Mode:       poa.ModeStateful,
+                StateStore: store,
         }
 }
 
@@ -37,6 +52,30 @@ func (p *PEP) EnforceAction(req *EnforcementRequest) (*EnforcementDecision, erro
                         Timestamp: time.Now(),
                         RequestID: req.RequestID,
                 }
+        }
+
+        if p.Mode == poa.ModeStateful {
+                if p.StateStore == nil {
+                        return nil, &EnforcementError{
+                                ErrorCode: "STATE_STORE_MISSING",
+                                Message:   "stateful mode requires a StateStore",
+                                Timestamp: time.Now(),
+                                RequestID: req.RequestID,
+                        }
+                }
+                liveState, err := p.StateStore.GetMandateState(snap.MandateID)
+                if err != nil {
+                        return nil, &EnforcementError{
+                                ErrorCode: "STATE_LOOKUP_FAILED",
+                                Message:   "failed to retrieve live mandate state: " + err.Error(),
+                                Timestamp: time.Now(),
+                                RequestID: req.RequestID,
+                        }
+                }
+                if req.Context == nil {
+                        req.Context = &EnforcementContext{}
+                }
+                req.Context.LiveMandateState = liveState
         }
 
         var checks []CheckResult
@@ -82,6 +121,28 @@ func (p *PEP) EnforceAction(req *EnforcementRequest) (*EnforcementDecision, erro
                 decision = poa.DecisionDeny
         } else if len(constraints) > 0 {
                 decision = poa.DecisionConstrain
+        }
+
+        if p.Mode == poa.ModeStateful && decision == poa.DecisionPermit {
+                cost := req.Action.AmountCents()
+                if cost > 0 {
+                        if err := p.StateStore.DeductBudget(snap.MandateID, cost); err != nil {
+                                return nil, &EnforcementError{
+                                        ErrorCode: "STATE_UPDATE_FAILED",
+                                        Message:   "failed to deduct budget: " + err.Error(),
+                                        Timestamp: time.Now(),
+                                        RequestID: req.RequestID,
+                                }
+                        }
+                }
+                if err := p.StateStore.IncrementToolCalls(snap.MandateID); err != nil {
+                        return nil, &EnforcementError{
+                                ErrorCode: "STATE_UPDATE_FAILED",
+                                Message:   "failed to increment tool calls: " + err.Error(),
+                                Timestamp: time.Now(),
+                                RequestID: req.RequestID,
+                        }
+                }
         }
 
         elapsed := time.Since(start)

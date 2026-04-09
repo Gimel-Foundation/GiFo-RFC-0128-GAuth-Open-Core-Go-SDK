@@ -1,8 +1,10 @@
 package management
 
 import (
+        "encoding/json"
         "net/http"
         "net/http/httptest"
+        "strings"
         "testing"
 
         "github.com/gimelfoundation/gauth-go/pkg/poa"
@@ -26,7 +28,8 @@ func validCreationRequest() *MandateCreationRequest {
                         AllowedPaths:      []string{"src/"},
                         DeniedPaths:       []string{".env"},
                         CoreVerbs: map[string]poa.ToolPolicy{
-                                "foundry.file.create": {Allowed: true, CostCentsBase: 1},
+                                "foundry.file.create":    {Allowed: true, CostCentsBase: 1},
+                                "foundry.agent.delegate": {Allowed: true, CostCentsBase: 0},
                         },
                 },
                 Requirements: poa.Requirements{
@@ -325,7 +328,11 @@ func TestCreateDelegation(t *testing.T) {
 
 func TestCreateDelegationNotAllowed(t *testing.T) {
         mgr := newTestManager()
-        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+        req := validCreationRequest()
+        req.Scope.CoreVerbs = map[string]poa.ToolPolicy{
+                "foundry.file.create": {Allowed: true, CostCentsBase: 1},
+        }
+        resp, _ := mgr.CreateMandate(req, "admin")
         mgr.ActivateMandate(resp.MandateID, "admin")
 
         err := mgr.CreateDelegation(resp.MandateID, "admin", "agent-sub")
@@ -501,6 +508,50 @@ func TestClientIntegration(t *testing.T) {
         }
 }
 
+func TestClientFullLifecycle(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        client := NewClient(ClientConfig{BaseURL: srv.URL, ActorID: "admin"})
+
+        resp, _ := client.CreateMandate(validCreationRequest())
+        client.ActivateMandate(resp.MandateID)
+
+        _, err := client.ExtendTTL(resp.MandateID, 3600)
+        if err != nil {
+                t.Fatalf("ExtendTTL: %v", err)
+        }
+
+        _, err = client.IncreaseBudget(resp.MandateID, 500)
+        if err != nil {
+                t.Fatalf("IncreaseBudget: %v", err)
+        }
+
+        _, err = client.CreateDelegation(resp.MandateID, "agent-sub")
+        if err != nil {
+                t.Fatalf("CreateDelegation: %v", err)
+        }
+
+        _, err = client.RevokeDelegation(resp.MandateID, "agent-sub")
+        if err != nil {
+                t.Fatalf("RevokeDelegation: %v", err)
+        }
+
+        _, err = client.AssignGovernanceProfile(resp.MandateID, poa.ProfileStandard)
+        if err != nil {
+                t.Fatalf("AssignGovernanceProfile: %v", err)
+        }
+
+        _, err = client.RevokeMandate(resp.MandateID, "test complete")
+        if err != nil {
+                t.Fatalf("RevokeMandate: %v", err)
+        }
+}
+
 func TestClientAPIError(t *testing.T) {
         mgr := newTestManager()
         handler := NewHTTPHandler(mgr)
@@ -538,4 +589,374 @@ func TestCreateDelegationNilCoreVerbsDenied(t *testing.T) {
         if err == nil {
                 t.Error("Expected error for delegation with nil CoreVerbs (fail-closed)")
         }
+}
+
+func TestHTTPHandlerRevokeMandate(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/activate", "application/json", nil)
+
+        body := map[string]string{"reason": "test revoke"}
+        resp, err := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/revoke", "application/json",
+                strings.NewReader(mustJSON(body)))
+        if err != nil {
+                t.Fatalf("revoke request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("revoke status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerExtendTTL(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/activate", "application/json", nil)
+
+        body := map[string]int{"additional_seconds": 7200}
+        resp, err := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/extend-ttl", "application/json",
+                strings.NewReader(mustJSON(body)))
+        if err != nil {
+                t.Fatalf("extend-ttl request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("extend-ttl status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerIncreaseBudget(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/activate", "application/json", nil)
+
+        body := map[string]int{"additional_cents": 5000}
+        resp, err := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/increase-budget", "application/json",
+                strings.NewReader(mustJSON(body)))
+        if err != nil {
+                t.Fatalf("increase-budget request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("increase-budget status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerDelegationAndRevoke(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/activate", "application/json", nil)
+
+        delBody := map[string]string{"delegatee_id": "agent-sub"}
+        resp, err := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/delegate", "application/json",
+                strings.NewReader(mustJSON(delBody)))
+        if err != nil {
+                t.Fatalf("delegate request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("delegate status = %d, want 200", resp.StatusCode)
+        }
+
+        revokeBody := map[string]string{"delegatee_id": "agent-sub"}
+        resp, err = http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/revoke-delegation", "application/json",
+                strings.NewReader(mustJSON(revokeBody)))
+        if err != nil {
+                t.Fatalf("revoke-delegation request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("revoke-delegation status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerGovernanceProfile(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/activate", "application/json", nil)
+
+        gpBody := map[string]string{"profile": string(poa.ProfileEnterprise)}
+        resp, err := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+created.MandateID+"/governance-profile", "application/json",
+                strings.NewReader(mustJSON(gpBody)))
+        if err != nil {
+                t.Fatalf("governance-profile request: %v", err)
+        }
+        if resp.StatusCode != 200 {
+                t.Errorf("governance-profile status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerInvalidJSON(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader("{invalid"))
+        if resp.StatusCode != 400 {
+                t.Errorf("Expected 400 for invalid JSON create, got %d", resp.StatusCode)
+        }
+}
+
+func TestHTTPHandlerListWithFilters(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+
+        resp, _ := http.Get(srv.URL + "/gauth/mgmt/v1/mandates?status=draft&limit=5&offset=0")
+        if resp.StatusCode != 200 {
+                t.Errorf("list with filters status = %d, want 200", resp.StatusCode)
+        }
+}
+
+func TestStoreDeepCopyIsolation(t *testing.T) {
+        mgr := newTestManager()
+        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+
+        m1, _ := mgr.store.Get(resp.MandateID)
+        m2, _ := mgr.store.Get(resp.MandateID)
+
+        m1.Parties.Subject = "mutated"
+        if m2.Parties.Subject == "mutated" {
+                t.Error("Store Get should return deep copies; mutation leaked")
+        }
+}
+
+func TestMandateListFiltering(t *testing.T) {
+        mgr := newTestManager()
+        mgr.CreateMandate(validCreationRequest(), "admin")
+
+        activeStatus := poa.StatusActive
+        list, _ := mgr.ListMandates("", "", &activeStatus, 10, 0)
+        if len(list) != 0 {
+                t.Error("No mandates should be active yet")
+        }
+
+        draftStatus := poa.StatusDraft
+        list, _ = mgr.ListMandates("", "", &draftStatus, 10, 0)
+        if len(list) != 1 {
+                t.Errorf("Expected 1 draft mandate, got %d", len(list))
+        }
+
+        list, _ = mgr.ListMandates("", "", nil, 10, 0)
+        if len(list) != 1 {
+                t.Errorf("Expected 1 total mandate, got %d", len(list))
+        }
+}
+
+func TestConsistencyChecksEdgeCases(t *testing.T) {
+        mgr := newTestManager()
+        reqBody := validCreationRequest()
+        reqBody.Parties.Subject = ""
+        _, err := mgr.CreateMandate(reqBody, "admin")
+        if err == nil {
+                t.Error("Expected error for empty subject")
+        }
+
+        reqBody2 := validCreationRequest()
+        reqBody2.Requirements.ApprovalMode = "invalid-mode"
+        _, err = mgr.CreateMandate(reqBody2, "admin")
+        if err == nil {
+                t.Error("Expected error for invalid approval mode")
+        }
+}
+
+func TestAPIErrorString(t *testing.T) {
+        e := &APIError{HTTPCode: 400, ErrorCode: "BAD", Message: "bad request"}
+        s := e.Error()
+        if s == "" {
+                t.Error("APIError.Error() should return non-empty string")
+        }
+}
+
+func TestClientListMandates(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        client := NewClient(ClientConfig{BaseURL: srv.URL, ActorID: "admin"})
+        client.CreateMandate(validCreationRequest())
+
+        activeStatus := poa.StatusActive
+        resp, err := client.ListMandates("", "", &activeStatus, 10, 0)
+        if err != nil {
+                t.Fatalf("ListMandates: %v", err)
+        }
+        if resp == nil {
+                t.Fatal("ListMandates response nil")
+        }
+}
+
+func TestHTTPHandlerMethodNotAllowed(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+        id := created.MandateID
+
+        endpoints := []string{
+                "/activate", "/suspend", "/resume", "/revoke",
+                "/extend-ttl", "/increase-budget",
+                "/delegate", "/revoke-delegation", "/governance-profile",
+        }
+
+        for _, ep := range endpoints {
+                req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/gauth/mgmt/v1/mandates/"+id+ep, nil)
+                resp, err := http.DefaultClient.Do(req)
+                if err != nil {
+                        t.Fatalf("request %s: %v", ep, err)
+                }
+                if resp.StatusCode != 405 {
+                        t.Errorf("%s: status = %d, want 405", ep, resp.StatusCode)
+                }
+        }
+}
+
+func TestHTTPHandlerInvalidJSONActions(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+        id := created.MandateID
+
+        http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+id+"/activate", "application/json", nil)
+
+        badJSON := "{invalid"
+        endpoints := []string{
+                "/extend-ttl", "/increase-budget",
+                "/delegate", "/revoke-delegation", "/governance-profile",
+        }
+        for _, ep := range endpoints {
+                resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+id+ep, "application/json",
+                        strings.NewReader(badJSON))
+                if resp.StatusCode != 400 {
+                        t.Errorf("%s bad JSON: status = %d, want 400", ep, resp.StatusCode)
+                }
+        }
+}
+
+func TestHTTPHandlerEmptyDelegatee(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        resp, _ := http.Post(srv.URL+"/gauth/mgmt/v1/mandates", "application/json",
+                strings.NewReader(mustJSON(validCreationRequest())))
+        var created struct{ MandateID string `json:"mandate_id"` }
+        json.NewDecoder(resp.Body).Decode(&created)
+        id := created.MandateID
+
+        resp, _ = http.Post(srv.URL+"/gauth/mgmt/v1/mandates/"+id+"/delegate", "application/json",
+                strings.NewReader(`{"delegatee_id":""}`))
+        if resp.StatusCode != 400 {
+                t.Errorf("empty delegatee: status = %d, want 400", resp.StatusCode)
+        }
+}
+
+func TestDeepCopyWithDelegations(t *testing.T) {
+        mgr := newTestManager()
+        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+        mgr.ActivateMandate(resp.MandateID, "admin")
+        mgr.CreateDelegation(resp.MandateID, "admin", "agent-sub")
+
+        m, _ := mgr.store.Get(resp.MandateID)
+        if m.Parties.Delegation == nil || len(m.Parties.Delegation.Entries) == 0 {
+                t.Fatal("Expected delegation chain entries")
+        }
+}
+
+func TestListMandatesPagination(t *testing.T) {
+        mgr := newTestManager()
+        for i := 0; i < 5; i++ {
+                mgr.CreateMandate(validCreationRequest(), "admin")
+        }
+
+        list, _ := mgr.ListMandates("", "", nil, 2, 0)
+        if len(list) != 2 {
+                t.Errorf("Expected 2 mandates with limit=2, got %d", len(list))
+        }
+
+        list, _ = mgr.ListMandates("", "", nil, 2, 3)
+        if len(list) != 2 {
+                t.Errorf("Expected 2 mandates with offset=3, got %d", len(list))
+        }
+}
+
+func mustJSON(v interface{}) string {
+        b, _ := json.Marshal(v)
+        return string(b)
 }

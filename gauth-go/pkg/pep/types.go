@@ -54,10 +54,11 @@ func (a *Action) AmountCents() int {
 }
 
 type CredentialReference struct {
-        Format    poa.CredentialFormat `json:"format"`
-        Token     string              `json:"token,omitempty"`
-        MandateID string              `json:"mandate_id,omitempty"`
-        PoASnapshot *PoASnapshot      `json:"poa_snapshot,omitempty"`
+        Format            poa.CredentialFormat `json:"format"`
+        Token             string              `json:"token,omitempty"`
+        MandateID         string              `json:"mandate_id,omitempty"`
+        PoASnapshot       *PoASnapshot        `json:"poa_snapshot,omitempty"`
+        SignatureVerified *bool               `json:"signature_verified,omitempty"`
 }
 
 type PoASnapshot struct {

@@ -45,6 +45,25 @@ func checkCredentialIntegrity(req *EnforcementRequest, snap *PoASnapshot) CheckR
                 }
         }
 
+        format := req.Credential.Format
+        if format != poa.FormatJWT && format != poa.FormatW3CVC && format != poa.FormatSDJWT {
+                return CheckResult{
+                        CheckID:   "CHK-01",
+                        CheckName: "Credential Integrity",
+                        Result:    poa.CheckFail,
+                        Detail:    fmt.Sprintf("Unsupported credential format: %q (must be jwt, w3c_vc, or sd-jwt)", format),
+                }
+        }
+
+        if req.Credential.SignatureVerified != nil && !*req.Credential.SignatureVerified {
+                return CheckResult{
+                        CheckID:   "CHK-01",
+                        CheckName: "Credential Integrity",
+                        Result:    poa.CheckFail,
+                        Detail:    "Credential signature has not been verified — callers must verify the token signature before PEP evaluation",
+                }
+        }
+
         if snap.SchemaVersion == "" {
                 return CheckResult{
                         CheckID:   "CHK-01",
@@ -60,6 +79,15 @@ func checkCredentialIntegrity(req *EnforcementRequest, snap *PoASnapshot) CheckR
                         CheckName: "Credential Integrity",
                         Result:    poa.CheckFail,
                         Detail:    fmt.Sprintf("Schema version mismatch: got %q, expected %q", snap.SchemaVersion, poa.SchemaVersion),
+                }
+        }
+
+        if snap.CredentialID == "" {
+                return CheckResult{
+                        CheckID:   "CHK-01",
+                        CheckName: "Credential Integrity",
+                        Result:    poa.CheckFail,
+                        Detail:    "Missing credential_id",
                 }
         }
 
@@ -96,7 +124,7 @@ func checkCredentialIntegrity(req *EnforcementRequest, snap *PoASnapshot) CheckR
                 CheckID:   "CHK-01",
                 CheckName: "Credential Integrity",
                 Result:    poa.CheckPass,
-                Detail:    "Credential integrity verified",
+                Detail:    "Credential integrity verified (format: " + string(format) + ")",
         }
 }
 
