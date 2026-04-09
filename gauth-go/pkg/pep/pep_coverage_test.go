@@ -67,6 +67,7 @@ func TestStatefulPEPPermitDeductsBudget(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -97,6 +98,7 @@ func TestStatefulPEPNoStoreError(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -119,6 +121,7 @@ func TestStatefulPEPStateLookupError(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -150,6 +153,7 @@ func TestStatefulPEPDeductBudgetError(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -175,6 +179,7 @@ func TestStatefulPEPIncrementError(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -199,6 +204,7 @@ func TestStatefulPEPDenyDoesNotMutateState(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -228,6 +234,7 @@ func TestCHK01UnsupportedFormat(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      "unknown-format",
                         PoASnapshot: snap,
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -264,6 +271,39 @@ func TestCHK01SignatureNotVerified(t *testing.T) {
         }
 }
 
+func TestCHK01NilSignatureVerifiedDenied(t *testing.T) {
+        p := New("1.0.0", poa.ModeStateless)
+        snap := validSnapshot()
+        req := &EnforcementRequest{
+                RequestID: "req-sig-nil",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for nil SignatureVerified (fail-closed)", dec.Decision)
+        }
+        found := false
+        for _, v := range dec.Violations {
+                if v.CheckID == "CHK-01" {
+                        found = true
+                        break
+                }
+        }
+        if !found {
+                t.Error("Expected CHK-01 violation for nil SignatureVerified")
+        }
+}
+
 func TestCHK01MissingCredentialID(t *testing.T) {
         p := New("1.0.0", poa.ModeStateless)
         snap := validSnapshot()
@@ -276,6 +316,7 @@ func TestCHK01MissingCredentialID(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -300,6 +341,7 @@ func TestCHK01ScopeChecksumMismatch(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -324,6 +366,7 @@ func TestCHK02NotBefore(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -348,6 +391,7 @@ func TestCHK02MandateStatusSuspended(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -371,6 +415,7 @@ func TestCHK02LiveMandateStatusSuspended(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
                 Context: &EnforcementContext{
                         LiveMandateState: &LiveMandateState{Status: "suspended"},
@@ -398,6 +443,7 @@ func TestCHK03InvalidGovernanceProfile(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -422,6 +468,7 @@ func TestCHK04InvalidPhase(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -446,6 +493,7 @@ func TestCHK04DeployInBuildPhase(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -470,6 +518,7 @@ func TestCHK06RegionAllowed(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -494,6 +543,7 @@ func TestCHK06RegionDenied(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -518,6 +568,7 @@ func TestCHK06RegionMissingInRequest(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -549,6 +600,7 @@ func TestCHK09VerbConstraintsPathPattern(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -580,6 +632,7 @@ func TestCHK09DeniedCommand(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -611,6 +664,7 @@ func TestCHK09AllowedCommandNotInList(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -638,6 +692,7 @@ func TestCHK10DatabaseWriteDenied(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -665,6 +720,7 @@ func TestCHK10DatabaseMigrateDenied(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -694,6 +750,7 @@ func TestCHK10DeploymentAutoDeployDisabled(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -721,6 +778,7 @@ func TestCHK10SecretReadDenied(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -748,6 +806,7 @@ func TestCHK10SecretCreateDenied(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -773,6 +832,7 @@ func TestCHK13BudgetExhausted(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -798,6 +858,7 @@ func TestCHK13BudgetLiveMandateState(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
                 Context: &EnforcementContext{
                         LiveMandateState: &LiveMandateState{
@@ -829,6 +890,7 @@ func TestCHK14SessionLinesCommitted(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
                 Context: &EnforcementContext{
                         SessionState: &SessionState{ToolCallsUsed: 5, LinesCommitted: 10},
@@ -935,6 +997,7 @@ func TestPEPHTTPEnforce(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         })
 
@@ -994,6 +1057,7 @@ func TestPEPHTTPEnforceWithRequestIDHeader(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         })
 
@@ -1024,6 +1088,7 @@ func TestPEPHTTPBatchEnforce(t *testing.T) {
                                 Credential: CredentialReference{
                                         Format:      poa.FormatJWT,
                                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                                 },
                         },
                 },
@@ -1065,6 +1130,7 @@ func TestPEPHTTPPolicy(t *testing.T) {
                 "credential": CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                        SignatureVerified:  boolPtr(true),
                 },
         })
 
@@ -1108,8 +1174,9 @@ func TestBatchIndependentMode(t *testing.T) {
                         Agent:     AgentIdentity{AgentID: "agent-test"},
                         Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
                         Credential: CredentialReference{
-                                Format:      poa.FormatJWT,
-                                PoASnapshot: snap,
+                                Format:            poa.FormatJWT,
+                                PoASnapshot:       snap,
+                                SignatureVerified:  boolPtr(true),
                         },
                 },
                 {
@@ -1118,8 +1185,9 @@ func TestBatchIndependentMode(t *testing.T) {
                         Agent:     AgentIdentity{AgentID: "agent-test"},
                         Action:    Action{Verb: "foundry.file.create", Resource: "secrets/key.pem"},
                         Credential: CredentialReference{
-                                Format:      poa.FormatJWT,
-                                PoASnapshot: snap,
+                                Format:            poa.FormatJWT,
+                                PoASnapshot:       snap,
+                                SignatureVerified:  boolPtr(true),
                         },
                 },
         }

@@ -55,12 +55,12 @@ func checkCredentialIntegrity(req *EnforcementRequest, snap *PoASnapshot) CheckR
                 }
         }
 
-        if req.Credential.SignatureVerified != nil && !*req.Credential.SignatureVerified {
+        if req.Credential.SignatureVerified == nil || !*req.Credential.SignatureVerified {
                 return CheckResult{
                         CheckID:   "CHK-01",
                         CheckName: "Credential Integrity",
                         Result:    poa.CheckFail,
-                        Detail:    "Credential signature has not been verified — callers must verify the token signature before PEP evaluation",
+                        Detail:    "Credential signature verification evidence is missing or false — callers must verify the token signature before PEP evaluation and set SignatureVerified to true",
                 }
         }
 

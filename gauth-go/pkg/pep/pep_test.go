@@ -61,6 +61,7 @@ func TestPEPPermit(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -95,6 +96,7 @@ func TestPEPDenyPathNotAllowed(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -132,6 +134,7 @@ func TestPEPDenyDeniedPath(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -159,6 +162,7 @@ func TestPEPDenyVerbNotAllowed(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -185,6 +189,7 @@ func TestPEPDenyExpiredCredential(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -209,6 +214,7 @@ func TestPEPDenyAgentMismatch(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -241,6 +247,7 @@ func TestPEPDenyBudgetExceeded(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -265,6 +272,7 @@ func TestPEPDenySessionLimitExceeded(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
                 Context: &EnforcementContext{
                         SessionState: &SessionState{
@@ -296,6 +304,7 @@ func TestPEPConstrainFourEyes(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -320,6 +329,7 @@ func TestPEPSkipSectorRegion(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -364,6 +374,7 @@ func TestPEPSectorDeny(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -387,14 +398,16 @@ func TestPEPBatchAllOrNothing(t *testing.T) {
                         Timestamp:  time.Now(),
                         Agent:      AgentIdentity{AgentID: "agent-test"},
                         Action:     Action{Verb: "foundry.file.create", Resource: "src/a.go"},
-                        Credential: CredentialReference{Format: poa.FormatJWT, PoASnapshot: snap},
+                        Credential: CredentialReference{Format: poa.FormatJWT, PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true)},
                 },
                 {
                         RequestID:  "batch-2",
                         Timestamp:  time.Now(),
                         Agent:      AgentIdentity{AgentID: "agent-test"},
                         Action:     Action{Verb: "foundry.file.create", Resource: "config/bad.yml"},
-                        Credential: CredentialReference{Format: poa.FormatJWT, PoASnapshot: snap},
+                        Credential: CredentialReference{Format: poa.FormatJWT, PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true)},
                 },
         }
 
@@ -417,6 +430,7 @@ func TestPEPMissingRequestID(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -437,6 +451,7 @@ func TestPEPAuditRecord(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: validSnapshot(),
+                        SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -471,6 +486,7 @@ func TestPEPTransactionTypeInvalid(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -496,6 +512,7 @@ func TestPEPTransactionTypePlanPhaseBlock(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -520,6 +537,7 @@ func TestPEPDecisionTypeInvalid(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -545,6 +563,7 @@ func TestPEPDecisionTypeAutomatedFourEyes(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -576,6 +595,7 @@ func TestPEPDelegationChainNonMonotonic(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -606,6 +626,7 @@ func TestPEPDelegationChainNoCoreVerbs(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
@@ -638,6 +659,7 @@ func TestPEPDelegationChainSubjectMismatch(t *testing.T) {
                 Credential: CredentialReference{
                         Format:      poa.FormatJWT,
                         PoASnapshot: snap,
+                                SignatureVerified:  boolPtr(true),
                 },
         }
 
