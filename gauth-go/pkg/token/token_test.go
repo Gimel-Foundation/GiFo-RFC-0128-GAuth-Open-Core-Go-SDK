@@ -494,6 +494,32 @@ func TestParseEdgeCases(t *testing.T) {
         }
 }
 
+func TestParseAlgKeyMismatch(t *testing.T) {
+        rsSigKey, _, _ := GenerateRS256Key("rs-key")
+        _, ecVerKey, _ := GenerateES256Key("rs-key")
+
+        gauthClaims := &GAuthClaims{
+                Version:             poa.SchemaVersion,
+                CredentialID:        "poa-mismatch",
+                ScopeChecksum:       "sha256:abc",
+                ToolPermissionsHash: "sha256:def",
+                PlatformPermHash:    "sha256:ghi",
+        }
+
+        builder := NewTokenBuilder(rsSigKey).
+                SetStandardClaims("iss", "sub", []string{"aud"}, time.Hour).
+                SetGAuthClaims(gauthClaims)
+        tok, err := builder.Build()
+        if err != nil {
+                t.Fatalf("Build: %v", err)
+        }
+
+        _, err = Parse(tok, []VerificationKey{*ecVerKey})
+        if err == nil {
+                t.Error("Expected error for alg/key mismatch (RS256 header with ES256 key)")
+        }
+}
+
 func TestBuildAndParse_ES256(t *testing.T) {
         sigKey, verKey, err := GenerateES256Key("test-es256-key")
         if err != nil {

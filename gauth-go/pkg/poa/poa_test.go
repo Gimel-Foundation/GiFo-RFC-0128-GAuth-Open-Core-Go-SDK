@@ -290,6 +290,25 @@ func TestComputePlatformPermissionsHash(t *testing.T) {
         }
 }
 
+func TestGovernanceProfileLevel(t *testing.T) {
+        tests := []struct {
+                profile GovernanceProfile
+                level   int
+        }{
+                {ProfileMinimal, 1},
+                {ProfileStandard, 2},
+                {ProfileStrict, 3},
+                {ProfileEnterprise, 4},
+                {ProfileBehoerde, 5},
+                {"invalid", 0},
+        }
+        for _, tt := range tests {
+                if got := tt.profile.Level(); got != tt.level {
+                        t.Errorf("GovernanceProfile(%q).Level() = %d, want %d", tt.profile, got, tt.level)
+                }
+        }
+}
+
 func TestComputeScopeChecksumWithSectorsRegions(t *testing.T) {
         scope := Scope{
                 GovernanceProfile: ProfileStandard,

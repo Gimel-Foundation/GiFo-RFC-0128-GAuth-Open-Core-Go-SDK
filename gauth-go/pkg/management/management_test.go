@@ -956,6 +956,50 @@ func TestListMandatesPagination(t *testing.T) {
         }
 }
 
+func TestTransitionToBudgetExceeded(t *testing.T) {
+        mgr := newTestManager()
+        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+        mgr.ActivateMandate(resp.MandateID, "admin")
+
+        err := mgr.TransitionToBudgetExceeded(resp.MandateID, "system")
+        if err != nil {
+                t.Fatalf("TransitionToBudgetExceeded: %v", err)
+        }
+
+        m, _ := mgr.GetMandate(resp.MandateID)
+        if m.Status != poa.StatusBudgetExceeded {
+                t.Errorf("Status = %q, want budget_exceeded", m.Status)
+        }
+}
+
+func TestTransitionToBudgetExceededNotActive(t *testing.T) {
+        mgr := newTestManager()
+        resp, _ := mgr.CreateMandate(validCreationRequest(), "admin")
+
+        err := mgr.TransitionToBudgetExceeded(resp.MandateID, "system")
+        if err == nil {
+                t.Error("Expected error: can only transition from active")
+        }
+}
+
+func TestGovernanceProfileCeiling(t *testing.T) {
+        mgr := newTestManager()
+        req := validCreationRequest()
+        req.Scope.GovernanceProfile = poa.ProfileStrict
+        resp, _ := mgr.CreateMandate(req, "admin")
+        mgr.ActivateMandate(resp.MandateID, "admin")
+
+        err := mgr.AssignGovernanceProfile(resp.MandateID, "admin", poa.ProfileEnterprise)
+        if err != nil {
+                t.Fatalf("Elevating profile should succeed: %v", err)
+        }
+
+        err = mgr.AssignGovernanceProfile(resp.MandateID, "admin", poa.ProfileStandard)
+        if err == nil {
+                t.Error("Expected error: cannot lower governance profile (ceiling enforcement)")
+        }
+}
+
 func mustJSON(v interface{}) string {
         b, _ := json.Marshal(v)
         return string(b)

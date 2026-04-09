@@ -172,6 +172,10 @@ func Parse(tokenString string, keys []VerificationKey) (*ExtendedTokenClaims, er
                 return nil, fmt.Errorf("gauth: no verification key found for kid %q", header.KeyID)
         }
 
+        if verifyKey.Algorithm != header.Algorithm {
+                return nil, fmt.Errorf("gauth: header alg %q does not match verification key alg %q", header.Algorithm, verifyKey.Algorithm)
+        }
+
         signingInput := parts[0] + "." + parts[1]
         signature, err := base64.RawURLEncoding.DecodeString(parts[2])
         if err != nil {

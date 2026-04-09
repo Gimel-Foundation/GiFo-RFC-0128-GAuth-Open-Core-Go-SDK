@@ -201,6 +201,19 @@ func (m *MandateManager) RevokeMandate(mandateID, actorID, reason string) error 
         return m.transitionStatus(mandate, poa.StatusRevoked, actorID, "Revoked: "+reason)
 }
 
+func (m *MandateManager) TransitionToBudgetExceeded(mandateID, actorID string) error {
+        mandate, err := m.store.Get(mandateID)
+        if err != nil {
+                return err
+        }
+
+        if mandate.Status != poa.StatusActive {
+                return fmt.Errorf("%w: can only transition to budget_exceeded from active state, current: %s", ErrInvalidTransition, mandate.Status)
+        }
+
+        return m.transitionStatus(mandate, poa.StatusBudgetExceeded, actorID, "Budget exhausted")
+}
+
 func (m *MandateManager) ExtendTTL(mandateID, actorID string, additionalSeconds int) error {
         mandate, err := m.store.Get(mandateID)
         if err != nil {
@@ -390,6 +403,10 @@ func (m *MandateManager) AssignGovernanceProfile(mandateID, actorID string, prof
         }
 
         oldProfile := mandate.Scope.GovernanceProfile
+        if profile.Level() < oldProfile.Level() {
+                return fmt.Errorf("%w: governance profile can only be elevated, not lowered (current: %s, requested: %s)", ErrValidationFailed, oldProfile, profile)
+        }
+
         mandate.Scope.GovernanceProfile = profile
 
         newChecksum, err := poa.ComputeScopeChecksum(mandate.Scope)
