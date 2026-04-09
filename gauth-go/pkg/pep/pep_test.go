@@ -588,6 +588,36 @@ func TestPEPDelegationChainNonMonotonic(t *testing.T) {
         }
 }
 
+func TestPEPDelegationChainNoCoreVerbs(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+
+        snap := validSnapshot()
+        snap.Scope.CoreVerbs = nil
+        snap.DelegationChain = &poa.DelegationChain{
+                Entries: []poa.DelegationEntry{
+                        {DelegateeID: "agent-a", Depth: 1},
+                },
+        }
+        req := &EnforcementRequest{
+                RequestID: "req-chain-noverbs",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-a"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:      poa.FormatJWT,
+                        PoASnapshot: snap,
+                },
+        }
+
+        dec, err := p.EnforceAction(req)
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("Decision = %q, want DENY for delegation chain with nil CoreVerbs", dec.Decision)
+        }
+}
+
 func TestPEPDelegationChainSubjectMismatch(t *testing.T) {
         p := New("1.0.0-test", poa.ModeStateless)
 

@@ -439,6 +439,94 @@ func TestHTTPDelegationRoute(t *testing.T) {
         }
 }
 
+func TestClientIntegration(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        client := NewClient(ClientConfig{
+                BaseURL: srv.URL,
+                ActorID: "test-actor",
+        })
+
+        resp, err := client.CreateMandate(validCreationRequest())
+        if err != nil {
+                t.Fatalf("CreateMandate: %v", err)
+        }
+        if resp.MandateID == "" {
+                t.Fatal("Expected mandate ID")
+        }
+
+        mandate, err := client.GetMandate(resp.MandateID)
+        if err != nil {
+                t.Fatalf("GetMandate: %v", err)
+        }
+        if mandate.Status != poa.StatusDraft {
+                t.Errorf("Status = %q, want draft", mandate.Status)
+        }
+
+        mandate, err = client.ActivateMandate(resp.MandateID)
+        if err != nil {
+                t.Fatalf("ActivateMandate: %v", err)
+        }
+        if mandate.Status != poa.StatusActive {
+                t.Errorf("Status = %q, want active", mandate.Status)
+        }
+
+        mandate, err = client.SuspendMandate(resp.MandateID, "test")
+        if err != nil {
+                t.Fatalf("SuspendMandate: %v", err)
+        }
+        if mandate.Status != poa.StatusSuspended {
+                t.Errorf("Status = %q, want suspended", mandate.Status)
+        }
+
+        mandate, err = client.ResumeMandate(resp.MandateID)
+        if err != nil {
+                t.Fatalf("ResumeMandate: %v", err)
+        }
+        if mandate.Status != poa.StatusActive {
+                t.Errorf("Status = %q, want active", mandate.Status)
+        }
+
+        listResp, err := client.ListMandates("", "", nil, 50, 0)
+        if err != nil {
+                t.Fatalf("ListMandates: %v", err)
+        }
+        if listResp.Total == 0 {
+                t.Error("Expected at least one mandate in list")
+        }
+}
+
+func TestClientAPIError(t *testing.T) {
+        mgr := newTestManager()
+        handler := NewHTTPHandler(mgr)
+        mux := http.NewServeMux()
+        handler.RegisterRoutes(mux)
+        srv := httptest.NewServer(mux)
+        defer srv.Close()
+
+        client := NewClient(ClientConfig{BaseURL: srv.URL})
+
+        _, err := client.GetMandate("nonexistent")
+        if err == nil {
+                t.Fatal("Expected error for nonexistent mandate")
+        }
+        apiErr, ok := err.(*APIError)
+        if !ok {
+                t.Fatalf("Expected *APIError, got %T", err)
+        }
+        if apiErr.HTTPCode != 404 {
+                t.Errorf("HTTPCode = %d, want 404", apiErr.HTTPCode)
+        }
+        if apiErr.ErrorCode != "NOT_FOUND" {
+                t.Errorf("ErrorCode = %q, want NOT_FOUND", apiErr.ErrorCode)
+        }
+}
+
 func TestCreateDelegationNilCoreVerbsDenied(t *testing.T) {
         mgr := newTestManager()
         reqBody := validCreationRequest()

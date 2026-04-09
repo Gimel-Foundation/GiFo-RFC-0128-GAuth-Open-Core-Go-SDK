@@ -734,21 +734,28 @@ func checkDelegationChain(req *EnforcementRequest, snap *PoASnapshot) CheckResul
                 }
         }
 
-        maxDepth := 0
-        if snap.Scope.CoreVerbs != nil {
-                if policy, ok := snap.Scope.CoreVerbs["foundry.agent.delegate"]; ok {
-                        if !policy.Allowed {
-                                return CheckResult{
-                                        CheckID:   "CHK-16",
-                                        CheckName: "Delegation Chain",
-                                        Result:    poa.CheckFail,
-                                        Detail:    "Delegation verb is not allowed but delegation chain is present",
-                                }
-                        }
-                        if policy.Constraints != nil && policy.Constraints.MaxDelegationDepth != nil {
-                                maxDepth = *policy.Constraints.MaxDelegationDepth
-                        }
+        if snap.Scope.CoreVerbs == nil {
+                return CheckResult{
+                        CheckID:   "CHK-16",
+                        CheckName: "Delegation Chain",
+                        Result:    poa.CheckFail,
+                        Detail:    "Delegation chain present but no core_verbs defined — denied by default",
                 }
+        }
+
+        policy, exists := snap.Scope.CoreVerbs["foundry.agent.delegate"]
+        if !exists || !policy.Allowed {
+                return CheckResult{
+                        CheckID:   "CHK-16",
+                        CheckName: "Delegation Chain",
+                        Result:    poa.CheckFail,
+                        Detail:    "Delegation chain present but delegation verb is not allowed",
+                }
+        }
+
+        maxDepth := 0
+        if policy.Constraints != nil && policy.Constraints.MaxDelegationDepth != nil {
+                maxDepth = *policy.Constraints.MaxDelegationDepth
         }
 
         chainLen := len(snap.DelegationChain.Entries)

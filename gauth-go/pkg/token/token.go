@@ -270,6 +270,13 @@ func ValidateIntegrity(claims *ExtendedTokenClaims, scope poa.Scope) error {
         return nil
 }
 
+func ValidateAll(claims *ExtendedTokenClaims, audience string, scope poa.Scope) error {
+        if err := Validate(claims, audience); err != nil {
+                return err
+        }
+        return ValidateIntegrity(claims, scope)
+}
+
 func sign(data []byte, key *SigningKey) ([]byte, error) {
         switch key.Algorithm {
         case AlgRS256:
