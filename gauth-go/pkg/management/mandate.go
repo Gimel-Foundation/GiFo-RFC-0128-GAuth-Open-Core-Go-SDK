@@ -271,6 +271,143 @@ func (m *MandateManager) IncreaseBudget(mandateID, actorID string, additionalCen
         return m.store.Save(mandate)
 }
 
+func (m *MandateManager) CreateDelegation(mandateID, actorID, delegateeID string) error {
+        mandate, err := m.store.Get(mandateID)
+        if err != nil {
+                return err
+        }
+
+        if mandate.Status != poa.StatusActive {
+                return fmt.Errorf("%w: cannot delegate from state %s (must be active)", ErrInvalidTransition, mandate.Status)
+        }
+
+        if mandate.Scope.CoreVerbs != nil {
+                dp, exists := mandate.Scope.CoreVerbs["foundry.agent.delegate"]
+                if !exists || !dp.Allowed {
+                        return fmt.Errorf("%w: delegation verb is not allowed in this mandate", ErrValidationFailed)
+                }
+
+                if dp.Constraints != nil && dp.Constraints.MaxDelegationDepth != nil {
+                        currentDepth := 0
+                        if mandate.Parties.Delegation != nil {
+                                currentDepth = len(mandate.Parties.Delegation.Entries)
+                        }
+                        if currentDepth >= *dp.Constraints.MaxDelegationDepth {
+                                return fmt.Errorf("%w: max delegation depth %d reached", ErrValidationFailed, *dp.Constraints.MaxDelegationDepth)
+                        }
+                }
+        }
+
+        scopeHash, err := poa.ComputeScopeChecksum(mandate.Scope)
+        if err != nil {
+                return fmt.Errorf("gauth: compute scope hash for delegation: %w", err)
+        }
+
+        entry := poa.DelegationEntry{
+                DelegatorID: mandate.Parties.Subject,
+                DelegateeID: delegateeID,
+                Depth:       1,
+                DelegatedAt: time.Now(),
+                ScopeHash:   scopeHash,
+        }
+
+        if mandate.Parties.Delegation == nil {
+                mandate.Parties.Delegation = &poa.DelegationChain{}
+        }
+        if len(mandate.Parties.Delegation.Entries) > 0 {
+                entry.Depth = mandate.Parties.Delegation.Entries[len(mandate.Parties.Delegation.Entries)-1].Depth + 1
+        }
+        mandate.Parties.Delegation.Entries = append(mandate.Parties.Delegation.Entries, entry)
+
+        mandate.UpdatedAt = time.Now()
+        mandate.AuditLog = append(mandate.AuditLog, AuditEntry{
+                Timestamp: time.Now(),
+                Action:    "create_delegation",
+                ActorID:   actorID,
+                Detail:    fmt.Sprintf("Delegated to %s at depth %d", delegateeID, entry.Depth),
+        })
+
+        return m.store.Save(mandate)
+}
+
+func (m *MandateManager) RevokeDelegation(mandateID, actorID, delegateeID string) error {
+        mandate, err := m.store.Get(mandateID)
+        if err != nil {
+                return err
+        }
+
+        if mandate.Status != poa.StatusActive && mandate.Status != poa.StatusSuspended {
+                return fmt.Errorf("%w: cannot revoke delegation from state %s", ErrInvalidTransition, mandate.Status)
+        }
+
+        if mandate.Parties.Delegation == nil || len(mandate.Parties.Delegation.Entries) == 0 {
+                return fmt.Errorf("gauth: no delegation chain to revoke from")
+        }
+
+        found := false
+        var remaining []poa.DelegationEntry
+        for _, e := range mandate.Parties.Delegation.Entries {
+                if e.DelegateeID == delegateeID && !found {
+                        found = true
+                        continue
+                }
+                if found {
+                        continue
+                }
+                remaining = append(remaining, e)
+        }
+
+        if !found {
+                return fmt.Errorf("gauth: delegatee %q not found in delegation chain", delegateeID)
+        }
+
+        mandate.Parties.Delegation.Entries = remaining
+        mandate.UpdatedAt = time.Now()
+        mandate.AuditLog = append(mandate.AuditLog, AuditEntry{
+                Timestamp: time.Now(),
+                Action:    "revoke_delegation",
+                ActorID:   actorID,
+                Detail:    fmt.Sprintf("Revoked delegation for %s and all downstream", delegateeID),
+        })
+
+        return m.store.Save(mandate)
+}
+
+func (m *MandateManager) AssignGovernanceProfile(mandateID, actorID string, profile poa.GovernanceProfile) error {
+        mandate, err := m.store.Get(mandateID)
+        if err != nil {
+                return err
+        }
+
+        if mandate.Status.IsTerminal() {
+                return fmt.Errorf("%w: mandate is in terminal state %s", ErrTerminalState, mandate.Status)
+        }
+
+        if !profile.IsValid() {
+                return fmt.Errorf("%w: invalid governance profile %q", ErrValidationFailed, profile)
+        }
+
+        oldProfile := mandate.Scope.GovernanceProfile
+        mandate.Scope.GovernanceProfile = profile
+
+        newChecksum, err := poa.ComputeScopeChecksum(mandate.Scope)
+        if err != nil {
+                mandate.Scope.GovernanceProfile = oldProfile
+                return fmt.Errorf("gauth: recompute scope checksum: %w", err)
+        }
+        mandate.ScopeChecksum = newChecksum
+
+        mandate.UpdatedAt = time.Now()
+        mandate.AuditLog = append(mandate.AuditLog, AuditEntry{
+                Timestamp: time.Now(),
+                Action:    "assign_governance_profile",
+                ActorID:   actorID,
+                Detail:    fmt.Sprintf("Governance profile changed from %s to %s", oldProfile, profile),
+        })
+
+        return m.store.Save(mandate)
+}
+
 func (m *MandateManager) transitionStatus(mandate *Mandate, newStatus poa.MandateStatus, actorID, detail string) error {
         oldStatus := mandate.Status
         mandate.Status = newStatus

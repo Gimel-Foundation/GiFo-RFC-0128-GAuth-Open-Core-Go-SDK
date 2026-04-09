@@ -1,0 +1,5 @@
+# Build outputs
+*.exe
+/basic
+*.test
+*.out
