@@ -1,0 +1,82 @@
+GAuth Open Core Go SDK
+Copyright (c) 2026 Gimel Foundation gGmbH i.G.
+https://gimelfoundation.com
+
+Licensed under the Mozilla Public License, Version 2.0 (MPL 2.0).
+
+SDK Specification: GiFo-RFC-0128-GAuth-Open-Core-Go-SDK
+
+This SDK implements the GAuth authorization protocol as defined in:
+  - GiFo-RFC 0110: GAuth Protocol Engine
+  - GiFo-RFC 0111: GAuth Authorization Framework
+  - GiFo-RFC 0115: Power-of-Attorney Credential Definition
+  - GiFo-RFC 0116: GAuth Interoperability (v2.2)
+  - GiFo-RFC 0117: GAuth Policy Enforcement Point (v1.2)
+  - GiFo-RFC 0118: GAuth Management API & Administration Interface (v1.1)
+
+================================================================================
+EXCLUSIONS — LIMITATIONS ON THE RIGHT TO MAKE DERIVATIVE WORKS
+================================================================================
+
+The following features are EXPLICITLY EXCLUDED from this open-source SDK.
+They are proprietary to Gimel Foundation / Gimel Technologies GmbH and are
+subject to separate license conditions. Users of this SDK MUST NOT — whether
+directly or indirectly — integrate:
+
+1. AI-ENABLED GOVERNANCE
+   - AI that supports and/or controls the process of an AI deployment lifecycle
+   - AI that tracks actions and/or decisions regarding authorization compliance
+   - AI that assures the quality of the outcome of AI engagements
+   - AI-assisted registration paths (Paths 1-3 as defined in RFC 0118)
+   - Risk scoring, regulatory interpretation, compliance reasoning
+   - Implied-authority mechanisms
+
+2. WEB3 / BLOCKCHAIN TECHNOLOGY
+   - Blockchain technology (including respective Web3 tokens and smart contracts)
+     for the extended token of GAuth
+   - Any decentralized ledger integration for credential storage or verification
+
+3. DNA-BASED IDENTITIES & POST-QUANTUM CRYPTOGRAPHY (PQC)
+   - DNA-based identities or identities based on genetic data
+   - AI that tracks the quality of DNA-based identities
+   - AI that tracks risks in terms of identity theft or any other risks
+   - Post-quantum cryptography (PQC) associated features
+
+4. DECENTRALIZED AUTHORIZATION DELEGATION
+   - Delegation of authorization decisions to AI team leads without human oversight
+
+These exclusions are protected by copyright and patent law (patent pending) of
+Gimel Foundation. Proprietary implementations are available through separate
+licensing from Gimel Foundation or Gimel Technologies GmbH.
+
+For proprietary adapter implementations, see the separate gauth-adapters-gimel
+package available under Gimel Terms of Service.
+
+================================================================================
+THIRD-PARTY NOTICES
+================================================================================
+
+This SDK builds upon the following open-source standards and their licenses:
+
+- OAuth 2.0 / OAuth 2.1: Apache License 2.0
+  https://www.rfc-editor.org/rfc/rfc6749
+
+- OpenID Connect: Apache License 2.0
+  https://openid.net/specs/openid-connect-core-1_0.html
+
+- Model Context Protocol (MCP): MIT License
+  https://github.com/modelcontextprotocol
+
+- JSON Web Token (JWT / RFC 7519): IETF Trust
+  https://www.rfc-editor.org/rfc/rfc7519
+
+Copyrights and licenses of these building blocks apply accordingly.
+
+================================================================================
+CONTACT
+================================================================================
+
+Gimel Foundation gGmbH i.G.
+Hardtweg 31, D-53639 Königswinter
+https://gimelfoundation.com
+https://github.com/Gimel-Foundation
