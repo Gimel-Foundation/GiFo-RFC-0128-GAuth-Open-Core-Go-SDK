@@ -13,7 +13,7 @@ If you discover a security vulnerability in the GAuth Open Core Go SDK, please r
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email: **security@gimel.foundation**
+Instead, please email: **info@gimelid.com**
 
 Include:
 - A description of the vulnerability
@@ -52,5 +52,5 @@ This security policy does not cover:
 ## Contact
 
 Gimel Foundation gGmbH i.G.
-security@gimel.foundation
+info@gimelid.com
 https://gimelfoundation.com

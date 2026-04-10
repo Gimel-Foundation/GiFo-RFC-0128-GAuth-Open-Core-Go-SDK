@@ -212,7 +212,7 @@ All contributions enter `main` through a reviewed pull request. The full conform
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for the vulnerability reporting process. Do not open public issues for security vulnerabilities — email security@gimel.foundation instead.
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting process. Do not open public issues for security vulnerabilities — email info@gimelid.com instead.
 
 ## License
 
