@@ -154,7 +154,7 @@ registry.Register(adapter.Registration{
 | `pkg/token` | JWT Extended Token creation, signing (RS256/ES256), parsing, validation, JWKS |
 | `pkg/pep` | Policy Enforcement Point with 16-check pipeline, HTTP binding |
 | `pkg/management` | Mandate lifecycle CRUD, state machine, validation, HTTP API |
-| `pkg/adapter` | Sealed adapter registry with Ed25519 verification, no-op defaults |
+| `pkg/adapter` | 7-slot connector registry (Types A/B/C/D), sealed Ed25519 manifest verification, tariff gating, license/ToS state machine |
 | `pkg/oauth` | OAuth 2.1 engine integration for token lifecycle |
 | `internal/canonical` | Deterministic JSON serialization and SHA-256 hashing |
 
@@ -196,28 +196,41 @@ DRAFT → ACTIVE → SUSPENDED (reversible)
 | `enterprise` | Enterprise-grade with comprehensive controls |
 | `behoerde` | Government/authority profile with maximum restrictions |
 
-## Exclusions
-
-The following features are **explicitly excluded** from this open-source SDK and are proprietary to Gimel Foundation:
-
-1. **AI-enabled Governance** — AI that supports/controls AI deployment lifecycle
-2. **Web3 / Blockchain** — Blockchain technology for extended tokens
-3. **DNA-based Identities & PQC** — DNA-based identities and post-quantum cryptography
-4. **Decentralized Authorization Delegation** — Delegation to AI team leads without human oversight
-5. **AI-assisted Registration Paths** — Paths 1-3 (only Path 4 rule-based is included)
-
-See [NOTICE](NOTICE) for full exclusion details.
-
 ## Running Tests
 
 ```bash
 cd gauth-go
 go test ./... -v
+go test ./... -cover
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, branch model, and CI gates.
+
+All contributions enter `main` through a reviewed pull request. The full conformance test suite (CT-REG, CT-PEP, CT-MGMT, CT-LIC, CT-S2S) must pass before merge.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting process. Do not open public issues for security vulnerabilities — email security@gimel.foundation instead.
 
 ## License
 
-This SDK is licensed under the [Mozilla Public License 2.0](LICENSE).
+This project is licensed under the [Mozilla Public License 2.0](LICENSE) with
+[Gimel Foundation Additional Terms](ADDITIONAL-TERMS.md).
+
+### Open Core Exclusions
+
+Three capabilities are excluded from the open-source license and are available
+only under the Gimel Technologies Terms of Service:
+
+1. **AI-Enabled Governance** (Slot 5)
+2. **Web3 Identity Integration** (Slot 6)
+3. **DNA-Based Identities / PQC** (Slot 7)
+
+The full PEP enforcement pipeline (16 checks), Management API, and all Type A/B
+adapter interfaces are fully open-source. See [ADDITIONAL-TERMS.md](ADDITIONAL-TERMS.md)
+for details and [NOTICE](NOTICE) for full exclusion text.
 
 Copyright (c) 2026 Gimel Foundation gGmbH i.G.
 
