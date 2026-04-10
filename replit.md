@@ -35,7 +35,7 @@ Go module implementing the Gimel Foundation's GAuth authorization protocol.
 | `pkg/token` | JWT Extended Token: RS256/ES256 signing, parsing, validation, JWKS. HS256 prohibited |
 | `pkg/pep` | Policy Enforcement Point: 16-check pipeline (CHK-01–CHK-16), fail-closed, HTTP binding |
 | `pkg/management` | Mandate lifecycle: CRUD, state machine (DRAFT→ACTIVE→terminal), validation, HTTP API |
-| `pkg/adapter` | Sealed adapter registry: Ed25519 signature verification, 5 adapter interfaces, no-op defaults |
+| `pkg/adapter` | 7-slot connector registry (Types A/B/C/D), sealed Ed25519 manifest verification, tariff gating matrix, license/ToS state machine, conformance test suite (CT-REG/CT-LIC) |
 | `pkg/oauth` | OAuth 2.1 engine integration for PoA-embedded token lifecycle |
 | `internal/canonical` | Deterministic JSON serialization (sorted keys, no whitespace, UTF-8) |
 
