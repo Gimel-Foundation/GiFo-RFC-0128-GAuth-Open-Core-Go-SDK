@@ -5,7 +5,7 @@ All notable changes to the GAuth Open Core Go SDK are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Version 0.91] — Public Preview
 
 ### Added
 - 7-slot connector registry with Type A/B/C/D adapter classification

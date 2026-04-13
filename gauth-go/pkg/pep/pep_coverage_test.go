@@ -1,3 +1,10 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Gimel Foundation gGmbH i.G.
+
 package pep
 
 import (
@@ -1204,5 +1211,245 @@ func TestBatchIndependentMode(t *testing.T) {
         }
         if dec.Decisions[1].Decision != poa.DecisionDeny {
                 t.Errorf("Decision[1] = %q, want DENY", dec.Decisions[1].Decision)
+        }
+}
+
+func TestEscalationAIGovernanceProfile(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+        snap := validSnapshot()
+        snap.Scope.GovernanceProfile = poa.ProfileEnterprise
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-ai-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(true),
+                },
+                Context: &EnforcementContext{
+                        LiveMandateState: &LiveMandateState{Status: "active", BudgetRemainingCents: 500},
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Escalation == nil {
+                t.Fatal("expected escalation info for enterprise profile")
+        }
+        if !dec.Escalation.Required {
+                t.Error("expected escalation required=true")
+        }
+        found := false
+        for _, r := range dec.Escalation.Reasons {
+                if r == EscalationAIGovernance {
+                        found = true
+                }
+        }
+        if !found {
+                t.Errorf("expected EscalationAIGovernance in reasons, got %v", dec.Escalation.Reasons)
+        }
+}
+
+func TestEscalationProprietaryRoute(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+        snap := validSnapshot()
+        snap.Scope.CoreVerbs["gimel.proprietary.action"] = poa.ToolPolicy{Allowed: true}
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-prop-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "gimel.proprietary.action", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(true),
+                },
+                Context: &EnforcementContext{
+                        LiveMandateState: &LiveMandateState{Status: "active", BudgetRemainingCents: 500},
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Escalation == nil {
+                t.Fatal("expected escalation info for proprietary route")
+        }
+        found := false
+        for _, r := range dec.Escalation.Reasons {
+                if r == EscalationProprietaryRoute {
+                        found = true
+                }
+        }
+        if !found {
+                t.Errorf("expected EscalationProprietaryRoute in reasons, got %v", dec.Escalation.Reasons)
+        }
+}
+
+func TestEscalationLiveMandateStateNil(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+        snap := validSnapshot()
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-lms-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(true),
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Escalation == nil {
+                t.Fatal("expected escalation info when LiveMandateState is nil")
+        }
+        found := false
+        for _, r := range dec.Escalation.Reasons {
+                if r == EscalationLiveMandateState {
+                        found = true
+                }
+        }
+        if !found {
+                t.Errorf("expected EscalationLiveMandateState in reasons, got %v", dec.Escalation.Reasons)
+        }
+}
+
+func TestNoEscalationWhenDenied(t *testing.T) {
+        p := New("1.0.0-test", poa.ModeStateless)
+        snap := validSnapshot()
+        snap.Scope.GovernanceProfile = poa.ProfileEnterprise
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-deny-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(false),
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("expected DENY, got %s", dec.Decision)
+        }
+        if dec.Escalation != nil {
+                t.Error("expected no escalation when decision is DENY")
+        }
+}
+
+type mockForwarder struct {
+        called  bool
+        result  *EnforcementDecision
+        err     error
+}
+
+func (m *mockForwarder) Forward(req *EnforcementRequest, reasons []EscalationReason) (*EnforcementDecision, error) {
+        m.called = true
+        return m.result, m.err
+}
+
+func TestForwarderCalledOnEscalation(t *testing.T) {
+        fwd := &mockForwarder{
+                result: &EnforcementDecision{
+                        RequestID: "forwarded",
+                        Decision:  poa.DecisionPermit,
+                },
+        }
+        p := &PEP{
+                Version:   "1.0.0-test",
+                Mode:      poa.ModeStateless,
+                Forwarder: fwd,
+        }
+        snap := validSnapshot()
+        snap.Scope.GovernanceProfile = poa.ProfileEnterprise
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-fwd-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(true),
+                },
+                Context: &EnforcementContext{
+                        LiveMandateState: &LiveMandateState{Status: "active", BudgetRemainingCents: 500},
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if !fwd.called {
+                t.Error("expected forwarder to be called")
+        }
+        if dec.RequestID != "forwarded" {
+                t.Errorf("expected forwarded result, got %s", dec.RequestID)
+        }
+}
+
+func TestForwarderErrorFallsBack(t *testing.T) {
+        fwd := &mockForwarder{
+                err: fmt.Errorf("auth pep unreachable"),
+        }
+        p := &PEP{
+                Version:   "1.0.0-test",
+                Mode:      poa.ModeStateless,
+                Forwarder: fwd,
+        }
+        snap := validSnapshot()
+        snap.Scope.GovernanceProfile = poa.ProfileBehoerde
+
+        dec, err := p.EnforceAction(&EnforcementRequest{
+                RequestID: "esc-fwd-err-1",
+                Timestamp: time.Now(),
+                Agent:     AgentIdentity{AgentID: "agent-test"},
+                Action:    Action{Verb: "foundry.file.create", Resource: "src/main.go"},
+                Credential: CredentialReference{
+                        Format:           poa.FormatJWT,
+                        PoASnapshot:      snap,
+                        SignatureVerified: boolPtr(true),
+                },
+                Context: &EnforcementContext{
+                        LiveMandateState: &LiveMandateState{Status: "active", BudgetRemainingCents: 500},
+                },
+        })
+        if err != nil {
+                t.Fatalf("EnforceAction: %v", err)
+        }
+        if !fwd.called {
+                t.Error("expected forwarder to be called")
+        }
+        if dec.Escalation == nil {
+                t.Fatal("expected escalation info on forwarder error")
+        }
+        if !dec.Escalation.Required {
+                t.Error("expected escalation required=true")
+        }
+}
+
+func TestNewHybridConstructor(t *testing.T) {
+        fwd := &mockForwarder{}
+        store := &mockStateStore{state: &LiveMandateState{Status: "active", BudgetRemainingCents: 100}}
+        p := NewHybrid("1.0.0-test", store, fwd)
+        if p.Mode != poa.ModeStateful {
+                t.Errorf("expected stateful mode, got %s", p.Mode)
+        }
+        if p.Forwarder == nil {
+                t.Error("expected forwarder to be set")
+        }
+        if p.StateStore == nil {
+                t.Error("expected state store to be set")
         }
 }

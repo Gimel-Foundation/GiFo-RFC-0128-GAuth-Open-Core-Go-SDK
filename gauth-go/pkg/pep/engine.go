@@ -1,6 +1,14 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Gimel Foundation gGmbH i.G.
+
 package pep
 
 import (
+        "strings"
         "time"
 
         "github.com/gimelfoundation/gauth-go/pkg/poa"
@@ -16,6 +24,7 @@ type PEP struct {
         Version    string
         Mode       poa.EnforcementMode
         StateStore StateStore
+        Forwarder  AuthPEPForwarder
 }
 
 func New(version string, mode poa.EnforcementMode) *PEP {
@@ -30,6 +39,15 @@ func NewStateful(version string, store StateStore) *PEP {
                 Version:    version,
                 Mode:       poa.ModeStateful,
                 StateStore: store,
+        }
+}
+
+func NewHybrid(version string, store StateStore, forwarder AuthPEPForwarder) *PEP {
+        return &PEP{
+                Version:    version,
+                Mode:       poa.ModeStateful,
+                StateStore: store,
+                Forwarder:  forwarder,
         }
 }
 
@@ -123,6 +141,24 @@ func (p *PEP) EnforceAction(req *EnforcementRequest) (*EnforcementDecision, erro
                 decision = poa.DecisionConstrain
         }
 
+        var escalation *EscalationInfo
+        if decision != poa.DecisionDeny {
+                reasons := detectEscalation(req, snap)
+                if len(reasons) > 0 {
+                        if p.Forwarder != nil {
+                                forwarded, fwdErr := p.Forwarder.Forward(req, reasons)
+                                if fwdErr == nil && forwarded != nil {
+                                        return forwarded, nil
+                                }
+                        }
+                        escalation = &EscalationInfo{
+                                Required: true,
+                                Reasons:  reasons,
+                                Fallback: decision,
+                        }
+                }
+        }
+
         if p.Mode == poa.ModeStateful && decision == poa.DecisionPermit {
                 cost := req.Action.AmountCents()
                 if cost > 0 {
@@ -155,6 +191,7 @@ func (p *PEP) EnforceAction(req *EnforcementRequest) (*EnforcementDecision, erro
                 Checks:          checks,
                 EnforcedConstraints: constraints,
                 Violations:      violations,
+                Escalation:      escalation,
                 Audit: AuditRecord{
                         ProcessingTimeMs:    float64(elapsed.Microseconds()) / 1000.0,
                         PEPVersion:          p.Version,
@@ -248,6 +285,27 @@ func (p *PEP) GetEnforcementPolicy(snap *PoASnapshot) *EnforcementPolicy {
         }
 
         return policy
+}
+
+func detectEscalation(req *EnforcementRequest, snap *PoASnapshot) []EscalationReason {
+        var reasons []EscalationReason
+
+        if snap.Scope.GovernanceProfile == poa.ProfileEnterprise || snap.Scope.GovernanceProfile == poa.ProfileBehoerde {
+                reasons = append(reasons, EscalationAIGovernance)
+        }
+
+        if req.Context == nil || req.Context.LiveMandateState == nil {
+                if snap.MandateStatus == "" || snap.MandateStatus == poa.StatusActive {
+                        reasons = append(reasons, EscalationLiveMandateState)
+                }
+        }
+
+        verb := extractVerbKey(req.Action.Verb)
+        if strings.HasPrefix(verb, "foundry.agent.") || strings.HasPrefix(verb, "gimel.") {
+                reasons = append(reasons, EscalationProprietaryRoute)
+        }
+
+        return reasons
 }
 
 func violationCodeForCheck(checkID string) string {

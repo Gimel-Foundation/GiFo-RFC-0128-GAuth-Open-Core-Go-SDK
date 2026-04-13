@@ -1,3 +1,10 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Gimel Foundation gGmbH i.G.
+
 package pep
 
 import (
@@ -99,6 +106,24 @@ type LiveMandateState struct {
         PlatformPermissions map[string]interface{} `json:"platform_permissions,omitempty"`
 }
 
+type EscalationReason string
+
+const (
+        EscalationAIGovernance    EscalationReason = "ai_governance_required"
+        EscalationLiveMandateState EscalationReason = "live_mandate_state_required"
+        EscalationProprietaryRoute EscalationReason = "proprietary_service_routing"
+)
+
+type EscalationInfo struct {
+        Required bool               `json:"required"`
+        Reasons  []EscalationReason `json:"reasons,omitempty"`
+        Fallback poa.Decision       `json:"fallback"`
+}
+
+type AuthPEPForwarder interface {
+        Forward(req *EnforcementRequest, reasons []EscalationReason) (*EnforcementDecision, error)
+}
+
 type EnforcementDecision struct {
         RequestID          string               `json:"request_id"`
         Decision           poa.Decision         `json:"decision"`
@@ -107,6 +132,7 @@ type EnforcementDecision struct {
         Checks             []CheckResult        `json:"checks"`
         EnforcedConstraints []EnforcedConstraint `json:"enforced_constraints,omitempty"`
         Violations         []Violation          `json:"violations,omitempty"`
+        Escalation         *EscalationInfo      `json:"escalation,omitempty"`
         Audit              AuditRecord          `json:"audit"`
 }
 

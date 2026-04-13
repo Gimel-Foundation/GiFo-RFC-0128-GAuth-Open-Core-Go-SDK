@@ -59,7 +59,7 @@ This includes:
 - The Type C adapter *interfaces* are open-source under MPL 2.0. Only the Gimel *implementations* are proprietary.
 - These exclusions apply only to the specific adapter slot interfaces (slots 5, 6, 7). They do not restrict any other use, modification, or redistribution of the open-source components.
 - The MPL 2.0 does not extend to the Excluded Components. They are outside its scope entirely.
-- Use of any proprietary service or Excluded Component triggers a license swap from MPL 2.0 to the Gimel Technologies Terms of Service.
+- Use of any proprietary service or Excluded Component additionally requires acceptance of the Gimel Technologies Terms of Service. This does not replace or revoke the MPL 2.0 license — both licenses coexist.
 
 ## Legal Framework
 
@@ -67,7 +67,7 @@ This includes:
 |-------|-------|-----------------|
 | **Gimel Foundation Legal Terms** | All use of GAuth (Open Core and proprietary) | Apply universally |
 | **MPL 2.0** | Open Core components only | Governs source code rights for Open Core |
-| **Gimel Technologies Terms of Service** | Proprietary services including Excluded Components | Apply after license swap |
+| **Gimel Technologies Terms of Service** | Proprietary services including Excluded Components | Apply in addition to MPL 2.0 when using proprietary services |
 
 **Gimel Foundation gGmbH i.G.** — The foundation publishes the GiFo-RFCs and the open-source project.
 

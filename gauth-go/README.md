@@ -1,5 +1,7 @@
 # GAuth Open Core Go SDK
 
+**Version 0.91 — Public Preview**
+
 **GiFo-RFC-0128** — Go implementation of the Gimel Foundation's GAuth authorization protocol.
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
@@ -216,8 +218,24 @@ See [SECURITY.md](SECURITY.md) for the vulnerability reporting process. Do not o
 
 ## License
 
-This project is licensed under the [Mozilla Public License 2.0](LICENSE) with
+This SDK is licensed under the [Mozilla Public License 2.0](LICENSE) with
 [Gimel Foundation Additional Terms](ADDITIONAL-TERMS.md).
+
+### Dual-Layer Licensing Model
+
+This SDK uses a coexistence licensing model. Both licenses apply simultaneously — the
+Gimel Technologies ToS does not replace or revoke the MPL 2.0 license on SDK code:
+
+| Layer | License | Scope | Revocable? |
+|-------|---------|-------|------------|
+| SDK source code | MPL 2.0 | File-level copyleft on SDK files; your own files in separate modules remain under your chosen license | No — irrevocable |
+| Proprietary Gimel services | Gimel Technologies ToS | Governs access to Gimel-hosted services (AaaS, managed infrastructure, Type C adapters) | Yes — service relationship |
+| Open specifications (RFCs) | Apache 2.0 | Interoperability protocols (RFC 0116, 0117, 0118) | No — irrevocable |
+
+You may run the SDK in pure Open Core mode (MPL 2.0 only, self-hosted, no Gimel services)
+indefinitely. If you choose to use proprietary Gimel services, the Gimel Technologies ToS
+applies **in addition to** MPL 2.0 — not as a replacement. Your SDK code and modifications
+to SDK files remain MPL 2.0 regardless.
 
 ### Open Core Exclusions
 
