@@ -503,6 +503,44 @@ func validateCreationRequest(req *MandateCreationRequest) error {
         return nil
 }
 
+func (mandate *Mandate) BuildPoAMapSummary() poa.PoAMapSummary {
+        summary := poa.PoAMapSummary{
+                MandateID: mandate.MandateID,
+                Subject:   mandate.Parties.Subject,
+                Scope:     mandate.Scope,
+        }
+
+        var permissions []poa.PoAPermission
+        var allowedActions []string
+        for verb, policy := range mandate.Scope.CoreVerbs {
+                effect := "deny"
+                if policy.Allowed {
+                        effect = "allow"
+                        allowedActions = append(allowedActions, verb)
+                }
+                permissions = append(permissions, poa.PoAPermission{
+                        Action: verb,
+                        Effect: effect,
+                })
+        }
+        summary.Permissions = permissions
+        summary.AllowedActions = allowedActions
+
+        var allowedDecisions []string
+        if mandate.Requirements.ApprovalMode == poa.ApprovalAutonomous {
+                allowedDecisions = append(allowedDecisions, "autonomous")
+        }
+        if mandate.Requirements.ApprovalMode == poa.ApprovalFourEyes {
+                allowedDecisions = append(allowedDecisions, "four_eyes")
+        }
+        if mandate.Requirements.ApprovalMode == poa.ApprovalSupervised {
+                allowedDecisions = append(allowedDecisions, "supervised")
+        }
+        summary.AllowedDecisions = allowedDecisions
+
+        return summary
+}
+
 func generateID() string {
         b := make([]byte, 16)
         rand.Read(b)

@@ -1,5 +1,7 @@
 # Gimel Foundation Additional Terms
 
+**Version 0.91 — Public Preview**
+
 These additional terms apply on top of the Mozilla Public License 2.0 (MPL 2.0) base license for all GAuth SDK repositories.
 
 ## Open Core Exclusions

@@ -1007,6 +1007,82 @@ func TestGovernanceProfileCeiling(t *testing.T) {
         }
 }
 
+func TestBuildPoAMapSummary(t *testing.T) {
+        mgr := newTestManager()
+        req := validCreationRequest()
+        resp, err := mgr.CreateMandate(req, "admin")
+        if err != nil {
+                t.Fatalf("CreateMandate: %v", err)
+        }
+
+        mandate, err := mgr.GetMandate(resp.MandateID)
+        if err != nil {
+                t.Fatalf("GetMandate: %v", err)
+        }
+
+        summary := mandate.BuildPoAMapSummary()
+
+        if summary.MandateID != resp.MandateID {
+                t.Errorf("MandateID = %q, want %q", summary.MandateID, resp.MandateID)
+        }
+        if summary.Subject != "agent-test" {
+                t.Errorf("Subject = %q, want agent-test", summary.Subject)
+        }
+        if len(summary.Permissions) == 0 {
+                t.Error("expected permissions to be populated")
+        }
+        if len(summary.AllowedActions) == 0 {
+                t.Error("expected allowed actions to be populated")
+        }
+
+        foundCreate := false
+        for _, a := range summary.AllowedActions {
+                if a == "foundry.file.create" {
+                        foundCreate = true
+                }
+        }
+        if !foundCreate {
+                t.Errorf("expected foundry.file.create in AllowedActions, got %v", summary.AllowedActions)
+        }
+
+        if len(summary.AllowedDecisions) == 0 {
+                t.Error("expected allowed decisions to be populated")
+        }
+        foundAutonomous := false
+        for _, d := range summary.AllowedDecisions {
+                if d == "autonomous" {
+                        foundAutonomous = true
+                }
+        }
+        if !foundAutonomous {
+                t.Errorf("expected autonomous in AllowedDecisions, got %v", summary.AllowedDecisions)
+        }
+}
+
+func TestBuildPoAMapSummaryFourEyes(t *testing.T) {
+        mgr := newTestManager()
+        req := validCreationRequest()
+        req.Requirements.ApprovalMode = poa.ApprovalFourEyes
+        req.Parties.ApprovalChain = []string{"approver1"}
+        resp, err := mgr.CreateMandate(req, "admin")
+        if err != nil {
+                t.Fatalf("CreateMandate: %v", err)
+        }
+
+        mandate, _ := mgr.GetMandate(resp.MandateID)
+        summary := mandate.BuildPoAMapSummary()
+
+        foundFourEyes := false
+        for _, d := range summary.AllowedDecisions {
+                if d == "four_eyes" {
+                        foundFourEyes = true
+                }
+        }
+        if !foundFourEyes {
+                t.Errorf("expected four_eyes in AllowedDecisions, got %v", summary.AllowedDecisions)
+        }
+}
+
 func mustJSON(v interface{}) string {
         b, _ := json.Marshal(v)
         return string(b)
