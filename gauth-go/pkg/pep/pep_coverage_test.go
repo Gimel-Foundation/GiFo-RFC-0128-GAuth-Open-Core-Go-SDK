@@ -1236,6 +1236,9 @@ func TestEscalationAIGovernanceProfile(t *testing.T) {
         if err != nil {
                 t.Fatalf("EnforceAction: %v", err)
         }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("expected DENY (fail-closed), got %s", dec.Decision)
+        }
         if dec.Escalation == nil {
                 t.Fatal("expected escalation info for enterprise profile")
         }
@@ -1275,6 +1278,9 @@ func TestEscalationProprietaryRoute(t *testing.T) {
         if err != nil {
                 t.Fatalf("EnforceAction: %v", err)
         }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("expected DENY (fail-closed), got %s", dec.Decision)
+        }
         if dec.Escalation == nil {
                 t.Fatal("expected escalation info for proprietary route")
         }
@@ -1292,6 +1298,7 @@ func TestEscalationProprietaryRoute(t *testing.T) {
 func TestEscalationLiveMandateStateNil(t *testing.T) {
         p := New("1.0.0-test", poa.ModeStateless)
         snap := validSnapshot()
+        snap.Scope.GovernanceProfile = poa.ProfileStrict
 
         dec, err := p.EnforceAction(&EnforcementRequest{
                 RequestID: "esc-lms-1",
@@ -1306,6 +1313,9 @@ func TestEscalationLiveMandateStateNil(t *testing.T) {
         })
         if err != nil {
                 t.Fatalf("EnforceAction: %v", err)
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("expected DENY (fail-closed), got %s", dec.Decision)
         }
         if dec.Escalation == nil {
                 t.Fatal("expected escalation info when LiveMandateState is nil")
@@ -1399,7 +1409,7 @@ func TestForwarderCalledOnEscalation(t *testing.T) {
         }
 }
 
-func TestForwarderErrorFallsBack(t *testing.T) {
+func TestForwarderErrorFailsClosed(t *testing.T) {
         fwd := &mockForwarder{
                 err: fmt.Errorf("auth pep unreachable"),
         }
@@ -1430,6 +1440,9 @@ func TestForwarderErrorFallsBack(t *testing.T) {
         }
         if !fwd.called {
                 t.Error("expected forwarder to be called")
+        }
+        if dec.Decision != poa.DecisionDeny {
+                t.Errorf("expected DENY (fail-closed on forwarder error), got %s", dec.Decision)
         }
         if dec.Escalation == nil {
                 t.Fatal("expected escalation info on forwarder error")

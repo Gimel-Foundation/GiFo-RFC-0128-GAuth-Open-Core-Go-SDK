@@ -151,10 +151,11 @@ func (p *PEP) EnforceAction(req *EnforcementRequest) (*EnforcementDecision, erro
                                         return forwarded, nil
                                 }
                         }
+                        decision = poa.DecisionDeny
                         escalation = &EscalationInfo{
                                 Required: true,
                                 Reasons:  reasons,
-                                Fallback: decision,
+                                Fallback: poa.DecisionDeny,
                         }
                 }
         }
@@ -295,7 +296,7 @@ func detectEscalation(req *EnforcementRequest, snap *PoASnapshot) []EscalationRe
         }
 
         if req.Context == nil || req.Context.LiveMandateState == nil {
-                if snap.MandateStatus == "" || snap.MandateStatus == poa.StatusActive {
+                if snap.Scope.GovernanceProfile.Level() >= poa.ProfileStrict.Level() {
                         reasons = append(reasons, EscalationLiveMandateState)
                 }
         }
