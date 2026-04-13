@@ -11,6 +11,7 @@ import (
         "crypto/rand"
         "errors"
         "fmt"
+        "sort"
         "time"
 
         "github.com/gimelfoundation/gauth-go/pkg/poa"
@@ -523,6 +524,8 @@ func (mandate *Mandate) BuildPoAMapSummary() poa.PoAMapSummary {
                         Effect: effect,
                 })
         }
+        sort.Slice(permissions, func(i, j int) bool { return permissions[i].Action < permissions[j].Action })
+        sort.Strings(allowedActions)
         summary.Permissions = permissions
         summary.AllowedActions = allowedActions
 
